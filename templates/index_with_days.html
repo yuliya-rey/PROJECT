@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Планировщик</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .day-tab {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .day-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        .task-item {
+            border-left: 4px solid #dee2e6;
+            transition: all 0.3s;
+        }
+        .task-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .priority-low { border-left-color: #28a745 !important; }
+        .priority-medium { border-left-color: #ffc107 !important; }
+        .priority-high { border-left-color: #dc3545 !important; }
+        .category-work { background-color: #e3f2fd; }
+        .category-study { background-color: #f3e5f5; }
+        .category-health { background-color: #e8f5e8; }
+        .category-general { background-color: #fff3e0; }
+        .progress-sm { height: 8px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-calendar-alt me-2"></i>Ежедневный Планировщик
+            </a>
+            {% if username %}
+            <div class="navbar-text">
+                <i class="fas fa-user me-1"></i> {{ username }} 
+                <a href="/logout" class="text-white ms-2"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+            {% else %}
+            <div>
+                <a href="/login" class="text-white me-3">Войти</a>
+                <a href="/register" class="text-white">Регистрация</a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% if username %}
+        
+        <!-- Навигация по дням недели -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-2 text-center">
+                    {% for day_key, day_name in week_days.items() %}
+                    <div class="col">
+                        <div class="day-tab p-2 rounded {% if selected_day == day_key %}active{% endif %}" 
+                             onclick="location.href='/?day={{ day_key }}'">
+                            <small>{{ day_name }}</small>
+                            {% if progress.days[day_key] %}
+                            <br>
+                            <small class="badge bg-light text-dark">
+                                {{ progress.days[day_key].completed }}/{{ progress.days[day_key].total }}
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Основной контент -->
+            <div class="col-lg-8">
+                <!-- Форма добавления задачи -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5><i class="fas fa-plus-circle me-2"></i>Добавить задачу на {{ week_days[selected_day] }}</h5>
+                        <form method="post" action="/tasks">
+                            <input type="hidden" name="day_of_week" value="{{ selected_day }}">
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <input type="text" name="title" class="form-control" placeholder="Название задачи" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <input type="time" name="task_time" class="form-control" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <select name="priority" class="form-select" required>
+                                        <option value="low">🟢 Низкий</option>
+                                        <option value="medium">🟡 Средний</option>
+                                        <option value="high">🔴 Высокий</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select name="category" class="form-select" required>
+                                        {% for cat_key, cat_name in categories.items() %}
+                                        <option value="{{ cat_key }}">{{ cat_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <textarea name="description" class="form-control" placeholder="Описание задачи" rows="1"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Список задач -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5>
+                            <i class="fas fa-tasks me-2"></i>
+                            Задачи на {{ week_days[selected_day] }} 
+                            <span class="badge bg-primary">{{ tasks|length }}</span>
+                        </h5>
+                        
+                        {% if tasks %}
+                        {% for task in tasks %}
+                        <div class="task-item card mb-2 priority-{{ task.priority }} category-{{ task.category }} {% if task.completed %}bg-light{% endif %}">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <input type="checkbox" class="form-check-input me-3 task-checkbox" 
+                                               data-task-id="{{ task.id }}"
+                                               {% if task.completed %}checked{% endif %}>
+                                        <div>
+                                            <h6 class="mb-1 {% if task.completed %}text-decoration-line-through text-muted{% endif %}">
+                                                {{ task.title }}
+                                            </h6>
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock"></i> {{ task.task_time }} | 
+                                                <i class="fas fa-tag"></i> {{ categories[task.category] }} |
+                                                {% if task.description %}{{ task.description }}{% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge me-2 
+                                            {% if task.priority == 'low' %}bg-success
+                                            {% elif task.priority == 'medium' %}bg-warning
+                                            {% else %}bg-danger{% endif %}">
+                                            {% if task.priority == 'low' %}🟢 Низкий
+                                            {% elif task.priority == 'medium' %}🟡 Средний
+                                            {% else %}🔴 Высокий{% endif %}
+                                        </span>
+                                        <button class="btn btn-sm btn-outline-danger delete-btn" data-task-id="{{ task.id }}">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-tasks fa-3x mb-3"></i>
+                            <p>Задач на этот день пока нет. Добавьте первую!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Боковая панель с прогрессом -->
+            <div class="col-lg-4">
+                <!-- Общий прогресс -->
+                <div class="card mb-3">
+                    <div class="card-body text-center">
+                        <h5><i class="fas fa-chart-line me-2"></i>Общий прогресс</h5>
+                        <div class="progress mb-2" style="height: 25px;">
+                            <div class="progress-bar bg-success progress-bar-striped" 
+                                 style="width: {{ progress.percentage }}%">
+                                {{ progress.percentage }}%
+                            </div>
+                        </div>
+                        <p class="mb-0">
+                            <strong>{{ progress.completed }} из {{ progress.total }} задач выполнено</strong>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Прогресс по категориям -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5><i class="fas fa-chart-pie me-2"></i>По категориям</h5>
+                        {% for cat_key, cat_data in progress.categories.items() %}
+                        {% if cat_data.total > 0 %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>{{ cat_data.name }}</span>
+                                <span>{{ cat_data.completed }}/{{ cat_data.total }}</span>
+                            </div>
+                            <div class="progress progress-sm mb-1">
+                                <div class="progress-bar" style="width: {{ cat_data.percentage }}%"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Статистика по дням -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-calendar me-2"></i>По дням недели</h5>
+                        {% for day_key, day_data in progress.days.items() %}
+                        {% if day_data.total > 0 %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>{{ day_data.name }}</span>
+                                <span>{{ day_data.completed }}/{{ day_data.total }}</span>
+                            </div>
+                            <div class="progress progress-sm mb-1">
+                                <div class="progress-bar" style="width: {{ day_data.percentage }}%"></div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <!-- Приветствие для неавторизованных -->
+        <div class="card">
+            <div class="card-body text-center">
+                <h4>Добро пожаловать в Ежедневный Планировщик!</h4>
+                <p>Планируйте свои задачи по дням недели и отслеживайте прогресс</p>
+                <div class="mt-3">
+                    <a href="/register" class="btn btn-primary me-2">
+                        <i class="fas fa-user-plus me-1"></i>Начать
+                    </a>
+                    <a href="/login" class="btn btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-1"></i>Войти
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Обработка чекбоксов
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkboxes = document.querySelectorAll('.task-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const taskId = this.dataset.taskId;
+                    fetch(`/tasks/${taskId}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                });
+            });
+
+            // Обработка удаления
+            const deleteButtons = document.querySelectorAll('.delete-btn');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const taskId = this.dataset.taskId;
+                    if (confirm('Удалить эту задачу?')) {
+                        fetch(`/tasks/${taskId}/delete`, {
+                            method: 'POST'
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                location.reload();
+                            }
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

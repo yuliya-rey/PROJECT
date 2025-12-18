@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if not username %}
+<div class="alert alert-info text-center">
+    <h4>Добро пожаловать в Ежедневный Планировщик!</h4>
+    <p>Пожалуйста, <a href="/login" class="alert-link">войдите</a> или <a href="/register" class="alert-link">зарегистрируйтесь</a> чтобы начать использовать планировщик.</p>
+</div>
+{% else %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4><i class="fas fa-list me-2"></i>Мои задачи на сегодня</h4>
+                <span class="badge bg-primary">{{ tasks|length }} задач</span>
+            </div>
+            <div class="card-body">
+                <!-- Форма добавления задачи -->
+                <form method="post" action="/tasks/" class="mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <input type="text" name="title" class="form-control" placeholder="Название задачи" required>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="time" name="task_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-2">
+                            <select name="priority" class="form-select" required>
+                                <option value="low">🟢 Низкий</option>
+                                <option value="medium">🟡 Средний</option>
+                                <option value="high">🟠 Высокий</option>
+                                <option value="urgent">🔴 Срочный</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select name="category" class="form-select" required>
+                                <option value="work">💼 Работа</option>
+                                <option value="personal">🏠 Личное</option>
+                                <option value="health">🏥 Здоровье</option>
+                                <option value="study">📚 Учеба</option>
+                                <option value="shopping">🛒 Покупки</option>
+                                <option value="general">📋 Общее</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-plus"></i> Добавить
+                            </button>
+                        </div>
+                        <div class="col-12">
+                            <textarea name="description" class="form-control" placeholder="Описание задачи" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Список задач -->
+                <div class="tasks-list">
+                    {% for task in tasks %}
+                    <div class="task-item card mb-2 priority-{{ task.priority }} category-{{ task.category }}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <input type="checkbox" class="form-check-input me-3 task-checkbox" 
+                                           data-task-id="{{ task.id }}"
+                                           {% if task.completed %}checked{% endif %}>
+                                    <div>
+                                        <h6 class="mb-1 {% if task.completed %}text-decoration-line-through text-muted{% endif %}">
+                                            {{ task.title }}
+                                        </h6>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock"></i> {{ task.task_time }}
+                                            <i class="fas fa-tag ms-2"></i> 
+                                            {% if task.category == 'work' %}💼 Работа
+                                            {% elif task.category == 'personal' %}🏠 Личное
+                                            {% elif task.category == 'health' %}🏥 Здоровье
+                                            {% elif task.category == 'study' %}📚 Учеба
+                                            {% elif task.category == 'shopping' %}🛒 Покупки
+                                            {% else %}📋 Общее{% endif %}
+                                            {% if task.description %} | {{ task.description }}{% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <span class="badge me-2 priority-badge {{ task.priority }}">
+                                        {% if task.priority == 'low' %}🟢 Низкий
+                                        {% elif task.priority == 'medium' %}🟡 Средний
+                                        {% elif task.priority == 'high' %}🟠 Высокий
+                                        {% else %}🔴 Срочный{% endif %}
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-danger delete-btn" data-task-id="{{ task.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-tasks fa-3x mb-3"></i>
+                        <p>Задач пока нет. Добавьте первую задачу!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Статистика -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line me-2"></i>Прогресс дня</h5>
+            </div>
+            <div class="card-body text-center">
+                {% set completed = tasks|selectattr("completed")|list|length %}
+                {% set total = tasks|length %}
+                {% set percentage = (completed / total * 100)|round(1) if total > 0 else 0 %}
+                
+                <div class="progress mb-3" style="height: 25px;">
+                    <div class="progress-bar bg-success progress-bar-striped" 
+                         style="width: {{ percentage }}%">
+                        {{ percentage }}%
+                    </div>
+                </div>
+                <p><strong>Выполнено: {{ completed }} из {{ total }} задач</strong></p>
+            </div>
+        </div>
+
+        <!-- Статистика по категориям -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie me-2"></i>По категориям</h5>
+            </div>
+            <div class="card-body">
+                {% set categories = {
+                    'work': '💼 Работа',
+                    'personal': '🏠 Личное', 
+                    'health': '🏥 Здоровье',
+                    'study': '📚 Учеба',
+                    'shopping': '🛒 Покупки',
+                    'general': '📋 Общее'
+                } %}
+                
+                {% for cat_key, cat_name in categories.items() %}
+                    {% set cat_tasks = tasks|selectattr("category", "equalto", cat_key)|list %}
+                    {% set cat_completed = cat_tasks|selectattr("completed")|list|length %}
+                    {% set cat_total = cat_tasks|length %}
+                    
+                    {% if cat_total > 0 %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>{{ cat_name }}</span>
+                            <span>{{ cat_completed }}/{{ cat_total }}</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar" style="width: {{ (cat_completed / cat_total * 100) if cat_total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
